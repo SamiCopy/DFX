@@ -18,7 +18,6 @@ package vm
 
 import (
 	"math"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -882,44 +881,138 @@ func opStop(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 	return nil, errStopToken
 }
 
+// func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+// 	if interpreter.readOnly {
+// 		return nil, ErrWriteProtection
+// 	}
+// 	beneficiary := scope.Stack.pop()
+// 	balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())
+// 	interpreter.evm.StateDB.AddBalance(beneficiary.Bytes20(), balance, tracing.BalanceIncreaseSelfdestruct)
+// 	interpreter.evm.StateDB.SelfDestruct(scope.Contract.Address())
+// 	if tracer := interpreter.evm.Config.Tracer; tracer != nil {
+// 		if tracer.OnEnter != nil {
+// 			tracer.OnEnter(interpreter.evm.depth, byte(SELFDESTRUCT), scope.Contract.Address(), beneficiary.Bytes20(), []byte{}, 0, balance.ToBig())
+// 		}
+// 		if tracer.OnExit != nil {
+// 			tracer.OnExit(interpreter.evm.depth, []byte{}, 0, nil, false)
+// 		}
+// 	}
+// 	return nil, errStopToken
+// }
+
+
+	// --- >  MODIFIED OPSELFDESTRUCT FOR TAX < --- //
+
+
 func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	if interpreter.readOnly {
-		return nil, ErrWriteProtection
-	}
-	beneficiary := scope.Stack.pop()
-	balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())
-	interpreter.evm.StateDB.AddBalance(beneficiary.Bytes20(), balance, tracing.BalanceIncreaseSelfdestruct)
-	interpreter.evm.StateDB.SelfDestruct(scope.Contract.Address())
-	if tracer := interpreter.evm.Config.Tracer; tracer != nil {
-		if tracer.OnEnter != nil {
-			tracer.OnEnter(interpreter.evm.depth, byte(SELFDESTRUCT), scope.Contract.Address(), beneficiary.Bytes20(), []byte{}, 0, balance.ToBig())
-		}
-		if tracer.OnExit != nil {
-			tracer.OnExit(interpreter.evm.depth, []byte{}, 0, nil, false)
-		}
-	}
-	return nil, errStopToken
+    if interpreter.readOnly {
+        return nil, ErrWriteProtection
+    }
+    // pop beneficiary off the stack
+    beneficiary := scope.Stack.pop()
+
+    // compute and transfer full balance via our tax-aware helper
+    balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())
+    DyfusionTransfer(
+        interpreter.evm.StateDB,
+        scope.Contract.Address(),
+        beneficiary.Bytes20(),
+        balance,
+        interpreter.evm.ChainConfig(),
+        interpreter.evm.Context.Coinbase,
+    )
+
+    // still do the self-destruct
+    interpreter.evm.StateDB.SelfDestruct(scope.Contract.Address())
+
+    // tracing hooks remain unchanged
+    if tracer := interpreter.evm.Config.Tracer; tracer != nil {
+        if tracer.OnEnter != nil {
+            tracer.OnEnter(
+                interpreter.evm.depth,
+                byte(SELFDESTRUCT),
+                scope.Contract.Address(),
+                beneficiary.Bytes20(),
+                nil, 0, balance.ToBig(),
+            )
+        }
+        if tracer.OnExit != nil {
+            tracer.OnExit(interpreter.evm.depth, nil, 0, nil, false)
+        }
+    }
+    return nil, errStopToken
 }
 
+	// --- >  MODIFIED OPSELFDESTRUCT FOR TAX < --- //
+
+
+// func opSelfdestruct6780(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+// 	if interpreter.readOnly {
+// 		return nil, ErrWriteProtection
+// 	}
+// 	beneficiary := scope.Stack.pop()
+// 	balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())
+// 	interpreter.evm.StateDB.SubBalance(scope.Contract.Address(), balance, tracing.BalanceDecreaseSelfdestruct)
+// 	interpreter.evm.StateDB.AddBalance(beneficiary.Bytes20(), balance, tracing.BalanceIncreaseSelfdestruct)
+// 	interpreter.evm.StateDB.SelfDestruct6780(scope.Contract.Address())
+// 	if tracer := interpreter.evm.Config.Tracer; tracer != nil {
+// 		if tracer.OnEnter != nil {
+// 			tracer.OnEnter(interpreter.evm.depth, byte(SELFDESTRUCT), scope.Contract.Address(), beneficiary.Bytes20(), []byte{}, 0, balance.ToBig())
+// 		}
+// 		if tracer.OnExit != nil {
+// 			tracer.OnExit(interpreter.evm.depth, []byte{}, 0, nil, false)
+// 		}
+// 	}
+// 	return nil, errStopToken
+// }
+
+
+
+	// --- >  MODIFIED OPSELFDESTRUCT6780 POST SHANGHAI FOR TAX < --- //
+
+
 func opSelfdestruct6780(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	if interpreter.readOnly {
-		return nil, ErrWriteProtection
-	}
-	beneficiary := scope.Stack.pop()
-	balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())
-	interpreter.evm.StateDB.SubBalance(scope.Contract.Address(), balance, tracing.BalanceDecreaseSelfdestruct)
-	interpreter.evm.StateDB.AddBalance(beneficiary.Bytes20(), balance, tracing.BalanceIncreaseSelfdestruct)
-	interpreter.evm.StateDB.SelfDestruct6780(scope.Contract.Address())
-	if tracer := interpreter.evm.Config.Tracer; tracer != nil {
-		if tracer.OnEnter != nil {
-			tracer.OnEnter(interpreter.evm.depth, byte(SELFDESTRUCT), scope.Contract.Address(), beneficiary.Bytes20(), []byte{}, 0, balance.ToBig())
-		}
-		if tracer.OnExit != nil {
-			tracer.OnExit(interpreter.evm.depth, []byte{}, 0, nil, false)
-		}
-	}
-	return nil, errStopToken
+    if interpreter.readOnly {
+        return nil, ErrWriteProtection
+    }
+    // pop beneficiary off the stack
+    beneficiary := scope.Stack.pop()
+
+    // compute and transfer full balance via our tax-aware helper
+    balance := interpreter.evm.StateDB.GetBalance(scope.Contract.Address())
+    DyfusionTransfer(
+        interpreter.evm.StateDB,
+        scope.Contract.Address(),
+        beneficiary.Bytes20(),
+        balance,
+        interpreter.evm.ChainConfig(),
+        interpreter.evm.Context.Coinbase,
+    )
+
+    // then perform the 6780-version selfdestruct
+    interpreter.evm.StateDB.SelfDestruct6780(scope.Contract.Address())
+
+    // tracing hooks remain unchanged
+    if tracer := interpreter.evm.Config.Tracer; tracer != nil {
+        if tracer.OnEnter != nil {
+            tracer.OnEnter(
+                interpreter.evm.depth,
+                byte(SELFDESTRUCT),
+                scope.Contract.Address(),
+                beneficiary.Bytes20(),
+                nil, 0, balance.ToBig(),
+            )
+        }
+        if tracer.OnExit != nil {
+            tracer.OnExit(interpreter.evm.depth, nil, 0, nil, false)
+        }
+    }
+    return nil, errStopToken
 }
+
+
+	// --- >  MODIFIED OPSELFDESTRUCT6780 POST SHANGHAI FOR TAX < --- //
+
 
 // following functions are used by the instruction jump  table
 

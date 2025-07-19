@@ -382,6 +382,15 @@ var NetworkNames = map[string]string{
 // set of configuration options.
 type ChainConfig struct {
 	ChainID *big.Int `json:"chainId"` // chainId identifies the current chain and is used for replay protection
+	
+	// --- >  TAX FIELDS < --- //
+
+	TaxEnabled      bool           `json:"taxEnabled,omitempty"`
+    TaxRate         uint64         `json:"taxRate,omitempty"`         // 5 == 5%
+    TreasuryAddress common.Address `json:"treasuryAddress,omitempty"` // EIP-55 checksum
+
+	// --- >  TAX FIELDS < --- //
+
 
 	HomesteadBlock *big.Int `json:"homesteadBlock,omitempty"` // Homestead switch block (nil = no fork, 0 = already homestead)
 

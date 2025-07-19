@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
+
 )
 
 type (
@@ -131,19 +132,56 @@ type EVM struct {
 // database and several configs. It meant to be used throughout the entire
 // state transition of a block, with the transaction context switched as
 // needed by calling evm.SetTxContext.
-func NewEVM(blockCtx BlockContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
-	evm := &EVM{
-		Context:     blockCtx,
-		StateDB:     statedb,
-		Config:      config,
-		chainConfig: chainConfig,
-		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil, blockCtx.Time),
-		jumpDests:   make(map[common.Hash]bitvec),
-	}
-	evm.precompiles = activePrecompiledContracts(evm.chainRules)
-	evm.interpreter = NewEVMInterpreter(evm)
-	return evm
+// func NewEVM(blockCtx BlockContext, statedb StateDB, chainConfig *params.ChainConfig, config Config) *EVM {
+// 	evm := &EVM{
+// 		Context:     blockCtx,
+// 		StateDB:     statedb,
+// 		Config:      config,
+// 		chainConfig: chainConfig,
+// 		chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil, blockCtx.Time),
+// 		jumpDests:   make(map[common.Hash]bitvec),
+// 	}
+// 	evm.precompiles = activePrecompiledContracts(evm.chainRules)
+// 	evm.interpreter = NewEVMInterpreter(evm)
+// 	return evm
+// }
+
+	// --- >  MODIFIED NEWEVM FOR TAX < --- //
+
+func NewEVM(
+    blockCtx BlockContext,
+    statedb StateDB,
+    chainConfig *params.ChainConfig,
+    config Config,
+) *EVM {
+    evm := &EVM{
+        Context:     blockCtx,
+        StateDB:     statedb,
+        Config:      config,
+        chainConfig: chainConfig,
+        chainRules:  chainConfig.Rules(blockCtx.BlockNumber, blockCtx.Random != nil, blockCtx.Time),
+        jumpDests:   make(map[common.Hash]bitvec),
+    }
+    evm.precompiles = activePrecompiledContracts(evm.chainRules)
+    evm.interpreter = NewEVMInterpreter(evm)
+
+    if chainConfig != nil && chainConfig.TaxEnabled {
+        // capture variables for closure
+        cc       := chainConfig
+        coinbase := evm.Context.Coinbase
+
+        // override Transfer exactly once
+        evm.Context.Transfer = func(db StateDB, from, to common.Address, amt *uint256.Int) {
+            DyfusionTransfer(db, from, to, amt, cc, coinbase)
+        }
+    }
+
+    return evm
 }
+
+	// --- >  MODIFIED NEWEVM FOR TAX < --- //
+
+
 
 // SetPrecompiles sets the precompiled contracts for the EVM.
 // This method is only used through RPC calls.
